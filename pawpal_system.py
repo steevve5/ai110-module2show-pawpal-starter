@@ -54,6 +54,7 @@ class Task:
     scheduled_time: str | None = None  # "HH:MM", filled in by Scheduler.build_plan
 
     def __post_init__(self) -> None:
+        """Validate and normalize priority and duration when a task is created."""
         self.priority = _check_priority(self.priority)
         self.duration_minutes = _check_duration(self.duration_minutes)
 
@@ -130,6 +131,7 @@ class Scheduler:
     """Builds and explains a daily care plan for an owner's pets."""
 
     def __init__(self, owner: Owner, start_time: str = "08:00") -> None:
+        """Set up a scheduler for this owner, starting the day at start_time ("HH:MM")."""
         _to_minutes(start_time)  # fail early on a bad start time
         self.owner = owner
         self.start_time = start_time
