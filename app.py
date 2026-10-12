@@ -69,7 +69,7 @@ else:
         with col2:
             duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
             priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
-            frequency = st.selectbox("Frequency", ["daily", "weekly"])
+            frequency = st.selectbox("Frequency", ["daily", "weekly", "once"])
         if st.form_submit_button("Add task"):
             if not task_title.strip():
                 st.error("Please enter a task title.")
@@ -84,7 +84,11 @@ else:
                         frequency=frequency,
                     )
                 )
-                st.success(f"Added '{task_title.strip()}' for {pet.name}.")
+                st.session_state.flash = f"Added '{task_title.strip()}' for {pet.name}."
+                st.rerun()  # rerun so the pets table above shows the new task count
+
+    if "flash" in st.session_state:
+        st.success(st.session_state.pop("flash"))
 
     all_tasks = owner.get_all_tasks()
     if all_tasks:
@@ -97,6 +101,7 @@ else:
                     "Priority": task.priority,
                     "Category": task.category,
                     "Frequency": task.frequency,
+                    "Due": task.due_date.strftime("%a %b %d"),
                     "Done": "✅" if task.completed else "",
                 }
                 for task in all_tasks
@@ -104,6 +109,23 @@ else:
         )
     else:
         st.info("No tasks yet. Add one above.")
+
+    pending = owner.filter_tasks(completed=False)
+    if pending:
+        with st.form("complete_task"):
+            labels = [f"{task.pet_name}: {task.title} (due {task.due_date:%a %b %d})" for task in pending]
+            choice = st.selectbox("Mark a task complete", range(len(pending)), format_func=lambda i: labels[i])
+            if st.form_submit_button("Mark complete"):
+                task = pending[choice]
+                pet = next(pet for pet in owner.pets if pet.name == task.pet_name)
+                next_task = pet.complete_task(task)  # recurring tasks get their next copy added
+                if next_task is not None:
+                    st.session_state.flash = (
+                        f"Done! Next '{task.title}' for {pet.name} is due {next_task.due_date:%a %b %d}."
+                    )
+                else:
+                    st.session_state.flash = f"Done! '{task.title}' for {pet.name} won't repeat."
+                st.rerun()  # rerun so the task table above shows the change
 
 st.divider()
 

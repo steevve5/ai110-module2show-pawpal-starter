@@ -40,8 +40,11 @@ The review raised a few other points that I decided to leave for later phases. `
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+**Conflicts are warnings, not fixes.** When two tasks have overlapping set times, `Scheduler.detect_conflicts()` only returns a warning message such as "Breakfast for Mochi (08:15-08:25) overlaps Flea treatment for Mochi (08:20-08:25)." It doesn't move either task or refuse to make a plan. The scheduler also checks for *overlapping* time slots rather than only identical start times, and it checks all pairs of tasks, across different pets too, since one owner can't do two things at once.
+
+This is reasonable for a pet owner because the owner knows things the app doesn't. Two breakfasts at 08:15 might be fine if the bowls go down together. A walk overlapping meds is a real problem. Automatically moving a task could push medication to the wrong time, which is worse than a clear warning. Checking every pair is slower in theory, but a day of pet care has a handful of tasks, so it's instant in practice. A faster approach that only compares neighbouring tasks would miss a long walk that overlaps two later tasks.
+
+A related tradeoff: `build_plan()` picks tasks greedily by priority (high first, shorter first among ties) and keeps anything that fits in the time left. That can leave a few minutes unused where a smarter "best fit" search might fill them exactly. But the greedy rule is easy to explain ("high priority comes first") and predictable, which matters more to a busy owner than squeezing in one extra low-priority task.
 
 ---
 
@@ -54,8 +57,7 @@ The review raised a few other points that I decided to leave for later phases. `
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+When I asked the AI how to simplify `detect_conflicts()`, it offered three options. The first used `itertools.combinations` to loop over every pair of tasks. The second was a faster "sweep" that tracks only the latest end time. The third packed the whole check into one nested list comprehension. I kept the `combinations` version because it removed the index juggling (`enumerate` plus `timed[:i]`) and reads like the idea itself: "check every pair." I rejected the sweep because it only remembers one earlier task, so it can miss a pair when three tasks overlap. It's faster, but for a few pet tasks correctness matters more than speed. I rejected the one-line comprehension because it was the most "Pythonic" but much harder to read. I checked the change by re-running the test suite (all 10 tests passed) and confirming `main.py` printed the same two conflict warnings as before.
 
 ---
 
