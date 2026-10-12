@@ -55,6 +55,36 @@ if owner.pets:
 else:
     st.info("No pets yet. Add one above.")
 
+def show_conflicts(scheduler: Scheduler) -> None:
+    """Show any time conflicts as one warning, with what overlaps and what to do about it."""
+    conflicts = scheduler.detect_conflicts()
+    if not conflicts:
+        return
+    plural = "s" if len(conflicts) > 1 else ""
+    st.warning(
+        f"**⚠️ {len(conflicts)} time conflict{plural} today.** You can't be in two places at once:\n\n"
+        + "\n".join(f"- {conflict}" for conflict in conflicts)
+        + "\n\nChange one task's time, or ignore this if you can do both together (like setting down two food bowls).",
+    )
+
+
+def task_rows(tasks: list[Task]) -> list[dict]:
+    """Turn tasks into table rows for st.table."""
+    return [
+        {
+            "Time": task.time or "any",
+            "Pet": task.pet_name,
+            "Task": task.title,
+            "Minutes": task.duration_minutes,
+            "Priority": task.priority,
+            "Repeats": task.frequency,
+            "Due": task.due_date.strftime("%a %b %d"),
+            "Status": "✅ done" if task.completed else "to do",
+        }
+        for task in tasks
+    ]
+
+
 # --- Tasks ---------------------------------------------------------------
 st.subheader("Tasks")
 if not owner.pets:
@@ -66,10 +96,12 @@ else:
             pet_choice = st.selectbox("For pet", [pet.name for pet in owner.pets])
             task_title = st.text_input("Task title", placeholder="Morning walk")
             category = st.selectbox("Category", ["walk", "feeding", "meds", "grooming", "enrichment", "general"])
+            has_time = st.checkbox("Must happen at a set time")
+            task_time = st.time_input("Set time", value=datetime.time(8, 0), step=datetime.timedelta(minutes=15))
         with col2:
             duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
             priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
-            frequency = st.selectbox("Frequency", ["daily", "weekly", "once"])
+            frequency = st.selectbox("Repeats", ["daily", "weekly", "once"])
         if st.form_submit_button("Add task"):
             if not task_title.strip():
                 st.error("Please enter a task title.")
@@ -82,6 +114,7 @@ else:
                         priority=priority,
                         category=category,
                         frequency=frequency,
+                        time=task_time.strftime("%H:%M") if has_time else None,
                     )
                 )
                 st.session_state.flash = f"Added '{task_title.strip()}' for {pet.name}."
@@ -90,23 +123,29 @@ else:
     if "flash" in st.session_state:
         st.success(st.session_state.pop("flash"))
 
-    all_tasks = owner.get_all_tasks()
-    if all_tasks:
-        st.table(
-            [
-                {
-                    "Pet": task.pet_name,
-                    "Task": task.title,
-                    "Minutes": task.duration_minutes,
-                    "Priority": task.priority,
-                    "Category": task.category,
-                    "Frequency": task.frequency,
-                    "Due": task.due_date.strftime("%a %b %d"),
-                    "Done": "✅" if task.completed else "",
-                }
-                for task in all_tasks
-            ]
+    if owner.get_all_tasks():
+        # Filter and sort with the logic layer: Owner.filter_tasks + Scheduler.sort_by_time / sort_tasks.
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            pet_filter = st.selectbox("Show pet", ["All pets"] + [pet.name for pet in owner.pets])
+        with col2:
+            status_filter = st.selectbox("Show", ["To do", "Done", "All"])
+        with col3:
+            sort_choice = st.selectbox("Sort by", ["Time of day", "Priority"])
+
+        tasks = owner.filter_tasks(
+            pet_name=None if pet_filter == "All pets" else pet_filter,
+            completed={"To do": False, "Done": True, "All": None}[status_filter],
         )
+        sorter = Scheduler(owner)
+        tasks = sorter.sort_by_time(tasks) if sort_choice == "Time of day" else sorter.sort_tasks(tasks)
+
+        if tasks:
+            st.table(task_rows(tasks))
+        else:
+            st.info("No tasks match these filters.")
+
+        show_conflicts(Scheduler(owner))
     else:
         st.info("No tasks yet. Add one above.")
 
@@ -138,10 +177,16 @@ if st.button("Generate schedule", type="primary"):
     scheduler.build_plan()
 
     if not scheduler.planned and not scheduler.skipped:
-        st.info("There are no pending tasks to schedule yet.")
+        st.info("There are no tasks due today to schedule.")
     else:
         used = sum(task.duration_minutes for task in scheduler.planned)
-        st.markdown(f"**Today's schedule for {owner.name}** — {used} of {owner.available_minutes} minutes planned")
+        st.success(
+            f"**Today's schedule for {owner.name}:** {len(scheduler.planned)} tasks, "
+            f"{used} of {owner.available_minutes} minutes planned."
+        )
+        conflict_count = len(scheduler.detect_conflicts())
+        if conflict_count:
+            st.warning(f"⚠️ {conflict_count} time conflict(s) among today's tasks. See the details under Tasks above.")
         if scheduler.planned:
             st.table(
                 [
@@ -155,10 +200,12 @@ if st.button("Generate schedule", type="primary"):
                     for task in scheduler.planned
                 ]
             )
+            st.caption("Tasks are ordered by priority (high first, then shortest) and run back to back from the start time.")
         if scheduler.skipped:
             st.warning(
-                "Skipped (not enough time left): "
-                + ", ".join(f"{task.title} for {task.pet_name} ({task.duration_minutes} min)" for task in scheduler.skipped)
+                f"**Didn't fit in your {owner.available_minutes} minutes:** "
+                + ", ".join(f"{task.title} for {task.pet_name} ({task.duration_minutes} min, {task.priority})" for task in scheduler.skipped)
+                + ". Add more time above or lower another task's priority."
             )
         with st.expander("Why this plan?"):
             st.text(scheduler.explain_plan())

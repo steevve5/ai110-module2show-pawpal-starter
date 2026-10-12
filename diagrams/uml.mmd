@@ -1,5 +1,5 @@
 classDiagram
-    %% PawPal+ draft UML. Keep this file updated so it matches your final implementation.
+    %% PawPal+ UML (same as uml_final.mmd): matches pawpal_system.py as built.
 
     class Owner {
         +str name
@@ -31,10 +31,10 @@ classDiagram
         +str category
         +str frequency
         +bool completed
-        +str time
+        +Optional~str~ time
         +date due_date
         +str pet_name
-        +str scheduled_time
+        +Optional~str~ scheduled_time
         +update(duration_minutes: int, priority: str) None
         +mark_complete() None
         +next_occurrence() Task
@@ -55,6 +55,28 @@ classDiagram
         +explain_plan() str
     }
 
+    class PRIORITY_RANK {
+        <<constant>>
+        low = 1
+        medium = 2
+        high = 3
+    }
+
+    class FREQUENCY_INTERVAL {
+        <<constant>>
+        daily = 1 day
+        weekly = 7 days
+        once = None
+    }
+
     Owner "1" o-- "*" Pet : has
     Pet "1" o-- "*" Task : needs
     Scheduler --> Owner : plans for
+    Scheduler ..> Task : sorts, filters, plans, checks conflicts
+    Task ..> Task : next_occurrence() creates next copy
+    Task ..> PRIORITY_RANK : priority_rank()
+    Task ..> FREQUENCY_INTERVAL : next_occurrence()
+
+    note for Task "pet_name is set by Pet.add_task so a task can name its pet.\ntime = owner's set time (optional); scheduled_time = slot from build_plan()."
+    note for Pet "complete_task() marks a task done and adds its\nnext copy (daily or weekly) to this pet's tasks."
+    note for Scheduler "Reads tasks only through owner.get_all_tasks().\nOnly pending tasks due on plan_date (or overdue) are planned."

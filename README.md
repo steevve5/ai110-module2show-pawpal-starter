@@ -1,28 +1,20 @@
-# PawPal+ (Module 2 Project)
+# 🐾 PawPal+
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+PawPal+ is a Streamlit app that helps a busy pet owner stay consistent with pet care. You enter your pets and their care tasks (walks, feeding, meds, grooming, play), say how much time you have today, and PawPal+ builds a daily plan that puts the most important tasks first. It explains what it planned and what didn't fit, warns you when two tasks clash, and brings recurring tasks back automatically.
 
-## Scenario
+## ✨ Features
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+- **Owner and multi-pet profiles:** one owner with a daily time budget and any number of pets.
+- **Care tasks with real details:** each task has a duration, a priority (low/medium/high), a category, an optional set time, and how often it repeats. Bad input (a 0-minute task, a priority like "urgent", a time like "25:00") is rejected with a clear message.
+- **Priority-based daily plan:** `Scheduler.build_plan()` plans high-priority tasks first (shortest first among ties), keeps every task that fits in your available minutes, gives each one a start time, and lists what was skipped.
+- **Plan explanations:** `Scheduler.explain_plan()` says how many minutes were used, how tasks were ordered, and why anything was left out.
+- **Sorting by time:** `Scheduler.sort_by_time()` puts tasks in time-of-day order using "HH:MM" string sorting, with untimed tasks last.
+- **Filtering by pet and status:** `Owner.filter_tasks()` shows one pet's tasks, only what's left to do, only what's done, or any combination.
+- **Daily and weekly recurrence:** completing a `daily` or `weekly` task automatically adds the next copy, due tomorrow or in a week (`timedelta`). `once` tasks don't repeat. Future copies stay out of today's plan, and completing the same task twice by mistake won't complete tomorrow's copy.
+- **Conflict warnings:** `Scheduler.detect_conflicts()` flags any two tasks whose time slots overlap, for the same pet or different pets, and shows a warning instead of crashing. Back-to-back tasks don't count as conflicts.
+- **Tested:** 33 automated tests cover sorting, planning, filtering, recurrence, conflicts, and input validation.
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
-
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
-
-## What you will build
-
-Your final app should:
-
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
-
-## Getting started
+## 🚀 Getting started
 
 ### Setup
 
@@ -32,15 +24,26 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Suggested workflow
+### Run it
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
+```bash
+streamlit run app.py      # the web app
+python main.py            # terminal demo of every scheduling feature
+python -m pytest          # the test suite
+```
+
+> If you edit `pawpal_system.py` while the app is running, restart `streamlit run`. Streamlit reloads `app.py` on save but not the modules it imports.
+
+### Project structure
+
+| File | What it is |
+|------|------------|
+| `pawpal_system.py` | Logic layer: the `Task`, `Pet`, `Owner`, and `Scheduler` classes |
+| `app.py` | Streamlit UI that calls the logic layer |
+| `main.py` | Terminal demo script |
+| `tests/test_pawpal.py` | Automated tests (pytest) |
+| `diagrams/uml_final.mmd` | Final Mermaid class diagram (paste into [mermaid.live](https://mermaid.live/) to view) |
+| `reflection.md` | Design decisions, tradeoffs, and reflection |
 
 ## 🖥️ Sample Output
 
@@ -159,16 +162,109 @@ Each task has a `due_date` (default: today) and a `frequency` of `daily`, `weekl
 ### Known limitations
 
 - `build_plan()` assigns start times by packing tasks one after another from the start time. It doesn't yet place a task at its own set `time`; set times are used for sorting and conflict checks.
-- The Streamlit form can't set a task's time yet, so conflict warnings currently show only in the terminal demo.
+- Plans that run past midnight wrap around to "00:00".
+- Data lives in the browser session only: refreshing the page or restarting the app starts fresh.
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+### What you can do in the app
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+| Section | Actions |
+|---------|---------|
+| **Owner** | Set your name and how many minutes you have for pet care today. |
+| **Pets** | Add a pet (name, species, age). Duplicate or blank names are rejected. The pets table shows how many tasks each pet has. |
+| **Tasks** | Add a task for a pet: title, category, duration, priority, how often it repeats, and optionally a set time. Filter the task list by pet and status, sort it by time of day or priority, and mark a task complete. Time conflicts appear as a yellow warning right under the list. |
+| **Build Schedule** | Pick a start time and click **Generate schedule** to see today's plan, what didn't fit, and a "Why this plan?" explanation. |
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+### Example workflow
+
+1. **Set up the owner.** Enter "Jordan" as the owner and set **Minutes available today** to 60.
+2. **Add pets.** In **Pets**, add "Mochi" (dog), then "Luna" (cat). Both appear in the pets table with 0 tasks.
+3. **Add tasks.** In **Tasks**, choose Mochi and add "Morning walk" (30 min, high, daily). Tick **Must happen at a set time** and pick 08:00. Then add "Breakfast" for Luna (5 min, high, daily), also set at 08:00, and "Brushing" for Luna (15 min, low, weekly) with no set time. Each task shows up in the table, and the pets table's task count updates.
+4. **See a conflict warning.** Because the walk (08:00-08:30) and Luna's breakfast (08:00-08:05) overlap, a yellow warning appears under the task list: *"⚠️ 1 time conflict today. Conflict (different pets): Morning walk for Mochi (08:00-08:30) overlaps Breakfast for Luna (08:00-08:05)"*, with a suggestion to change one time or ignore it if you can do both.
+5. **Sort and filter.** Set **Sort by** to "Time of day" to see the 08:00 tasks first and Brushing ("any") last. Set **Show pet** to "Luna" to see only Luna's tasks.
+6. **Generate the schedule.** Click **Generate schedule**. A green summary shows "3 tasks, 50 of 60 minutes planned", followed by the plan table in priority order: Luna's breakfast, Mochi's walk, then Brushing. Open **Why this plan?** for the full explanation.
+7. **Complete a recurring task.** Under **Mark a task complete**, choose Luna's breakfast and click **Mark complete**. The app confirms *"Next 'Breakfast' for Luna is due"* tomorrow; today's copy shows ✅ done and a new copy due tomorrow appears in the list (set **Show** to "All" to see both).
+8. **Re-plan.** Click **Generate schedule** again. Luna's breakfast is gone from today's plan, because it's done and tomorrow's copy isn't due yet.
+
+### Scheduler behaviors on display
+
+- **Priority planning:** high-priority tasks are planned first. If time runs out, lower-priority tasks are listed as skipped with a tip to add time.
+- **Sorting by time:** the task list can be ordered by time of day, with untimed tasks last.
+- **Filtering:** by pet and by status (to do, done, all).
+- **Conflict warnings:** overlapping set times, across pets too, are flagged as soon as they exist.
+- **Recurrence:** completing a daily or weekly task schedules the next one, and future copies stay off today's plan.
+
+### Sample CLI output
+
+`python main.py` runs the same logic in the terminal with two pets and nine tasks. It completes a recurring task, sorts and filters the task list, checks for conflicts, and prints today's schedule:
+
+```
+  Completed Luna's Thyroid meds -> next one added for Mon Oct 12
+
+  All tasks, in the order they were added:
+    17:00  Fetch in yard   Mochi  daily   due Sun Oct 11  to do
+    07:30  Morning walk    Mochi  daily   due Sun Oct 11  to do
+    08:15  Breakfast       Mochi  daily   due Sun Oct 11  to do
+    08:20  Flea treatment  Mochi  daily   due Sun Oct 11  to do
+    19:00  Laser play      Luna   daily   due Sun Oct 11  to do
+    08:00  Thyroid meds    Luna   daily   due Sun Oct 11  done
+    --:--  Brushing        Luna   weekly  due Sun Oct 11  to do
+    08:15  Breakfast       Luna   daily   due Sun Oct 11  to do
+    08:00  Thyroid meds    Luna   daily   due Mon Oct 12  to do
+
+  Sorted by time (sort_by_time):
+    07:30  Morning walk    Mochi  daily   due Sun Oct 11  to do
+    08:00  Thyroid meds    Luna   daily   due Sun Oct 11  done
+    08:00  Thyroid meds    Luna   daily   due Mon Oct 12  to do
+    08:15  Breakfast       Mochi  daily   due Sun Oct 11  to do
+    08:15  Breakfast       Luna   daily   due Sun Oct 11  to do
+    08:20  Flea treatment  Mochi  daily   due Sun Oct 11  to do
+    17:00  Fetch in yard   Mochi  daily   due Sun Oct 11  to do
+    19:00  Laser play      Luna   daily   due Sun Oct 11  to do
+    --:--  Brushing        Luna   weekly  due Sun Oct 11  to do
+
+  Only Luna's tasks (filter_tasks pet_name='Luna'):
+    19:00  Laser play      Luna   daily   due Sun Oct 11  to do
+    08:00  Thyroid meds    Luna   daily   due Sun Oct 11  done
+    --:--  Brushing        Luna   weekly  due Sun Oct 11  to do
+    08:15  Breakfast       Luna   daily   due Sun Oct 11  to do
+    08:00  Thyroid meds    Luna   daily   due Mon Oct 12  to do
+
+  Still to do (filter_tasks completed=False):
+    17:00  Fetch in yard   Mochi  daily   due Sun Oct 11  to do
+    07:30  Morning walk    Mochi  daily   due Sun Oct 11  to do
+    08:15  Breakfast       Mochi  daily   due Sun Oct 11  to do
+    08:20  Flea treatment  Mochi  daily   due Sun Oct 11  to do
+    19:00  Laser play      Luna   daily   due Sun Oct 11  to do
+    --:--  Brushing        Luna   weekly  due Sun Oct 11  to do
+    08:15  Breakfast       Luna   daily   due Sun Oct 11  to do
+    08:00  Thyroid meds    Luna   daily   due Mon Oct 12  to do
+
+  Mochi's tasks still to do, sorted by time:
+    07:30  Morning walk    Mochi  daily   due Sun Oct 11  to do
+    08:15  Breakfast       Mochi  daily   due Sun Oct 11  to do
+    08:20  Flea treatment  Mochi  daily   due Sun Oct 11  to do
+    17:00  Fetch in yard   Mochi  daily   due Sun Oct 11  to do
+
+  Conflict check (detect_conflicts):
+    WARNING: Conflict (different pets): Breakfast for Mochi (08:15-08:25) overlaps Breakfast for Luna (08:15-08:20)
+    WARNING: Conflict (both for Mochi): Breakfast for Mochi (08:15-08:25) overlaps Flea treatment for Mochi (08:20-08:25)
+
+========================================================
+  Today's Schedule for Jordan
+  85 of 90 minutes planned, starting 07:30
+========================================================
+  Time   Task              Pet       Length  Priority
+  ----------------------------------------------------
+  07:30  Breakfast         Luna       5 min  high
+  07:35  Breakfast         Mochi     10 min  high
+  07:45  Morning walk      Mochi     30 min  high
+  08:15  Flea treatment    Mochi      5 min  medium
+  08:20  Fetch in yard     Mochi     20 min  medium
+  08:40  Brushing          Luna      15 min  low
+
+  Skipped (not enough time left):
+    - Laser play for Luna (25 min, low)
+========================================================
+```

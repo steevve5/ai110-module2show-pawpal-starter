@@ -1,0 +1,82 @@
+classDiagram
+    %% PawPal+ final UML: matches pawpal_system.py as built.
+
+    class Owner {
+        +str name
+        +int available_minutes
+        +list~str~ preferences
+        +list~Pet~ pets
+        +add_pet(pet: Pet) None
+        +remove_pet(name: str) None
+        +get_all_tasks() list~Task~
+        +filter_tasks(pet_name: str, completed: bool) list~Task~
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +int age
+        +list~Task~ tasks
+        +add_task(task: Task) None
+        +remove_task(title: str) None
+        +complete_task(task: Task) Task
+        +mark_task_complete(title: str) Task
+        +get_pending_tasks() list~Task~
+    }
+
+    class Task {
+        +str title
+        +int duration_minutes
+        +str priority
+        +str category
+        +str frequency
+        +bool completed
+        +Optional~str~ time
+        +date due_date
+        +str pet_name
+        +Optional~str~ scheduled_time
+        +update(duration_minutes: int, priority: str) None
+        +mark_complete() None
+        +next_occurrence() Task
+        +priority_rank() int
+    }
+
+    class Scheduler {
+        +Owner owner
+        +str start_time
+        +date plan_date
+        +list~Task~ planned
+        +list~Task~ skipped
+        +sort_tasks(tasks: list~Task~) list~Task~
+        +sort_by_time(tasks: list~Task~) list~Task~
+        +due_tasks() list~Task~
+        +detect_conflicts() list~str~
+        +build_plan() list~Task~
+        +explain_plan() str
+    }
+
+    class PRIORITY_RANK {
+        <<constant>>
+        low = 1
+        medium = 2
+        high = 3
+    }
+
+    class FREQUENCY_INTERVAL {
+        <<constant>>
+        daily = 1 day
+        weekly = 7 days
+        once = None
+    }
+
+    Owner "1" o-- "*" Pet : has
+    Pet "1" o-- "*" Task : needs
+    Scheduler --> Owner : plans for
+    Scheduler ..> Task : sorts, filters, plans, checks conflicts
+    Task ..> Task : next_occurrence() creates next copy
+    Task ..> PRIORITY_RANK : priority_rank()
+    Task ..> FREQUENCY_INTERVAL : next_occurrence()
+
+    note for Task "pet_name is set by Pet.add_task so a task can name its pet.\ntime = owner's set time (optional); scheduled_time = slot from build_plan()."
+    note for Pet "complete_task() marks a task done and adds its\nnext copy (daily or weekly) to this pet's tasks."
+    note for Scheduler "Reads tasks only through owner.get_all_tasks().\nOnly pending tasks due on plan_date (or overdue) are planned."

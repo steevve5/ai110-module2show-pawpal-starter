@@ -29,14 +29,29 @@ I also noted that `build_plan` has to clear `planned` and `skipped` before it ru
 
 The review raised a few other points that I decided to leave for later phases. `Owner.preferences` isn't used by the Scheduler yet. `frequency` doesn't do anything until the scheduler knows what day it is. And removing tasks or pets by name is ambiguous if two of them share a name.
 
+The design kept changing as I added the smarter features in Phase 4:
+
+- **`Task.time` and `Task.due_date`.** Sorting by time and detecting conflicts both need a time the *owner* chooses, which is different from the slot the scheduler assigns (`scheduled_time`). Recurring tasks need a due date, which finally gave `frequency` a job: the scheduler only plans tasks due today.
+- **Completion moved onto `Pet`.** When a recurring task is completed, its next copy has to be added to some pet's task list. I put `complete_task()` on `Pet` rather than `Scheduler`, because the pet owns the list. The Streamlit "Mark complete" button and `main.py` both call that one method.
+- **New Scheduler helpers.** `due_tasks()` became the single definition of "pending and due today," shared by `build_plan()` and `detect_conflicts()`.
+
+The final diagram is in `diagrams/uml_final.mmd`. The four classes and their main relationships are the same as my first draft. The changes are new fields, a few new methods, and the links showing that the Scheduler works on Tasks and that a Task creates its next copy.
+
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+The scheduler considers these constraints:
+
+- **Time available:** the owner's minutes for the day. This is a hard limit; a task that doesn't fit in the remaining time is skipped.
+- **Priority:** high, medium, or low. Higher-priority tasks are planned first.
+- **Duration:** among tasks with the same priority, shorter ones go first, so more tasks fit.
+- **Due date and completion:** only pending tasks due today (or overdue) are planned, so done tasks and tomorrow's copies of recurring tasks stay out.
+- **Set times:** used for sorting and for conflict warnings when two tasks overlap.
+
+I treated time and priority as the most important because they match how a busy owner actually thinks: "I have an hour; what can't be skipped?" Medication and feeding have to happen, while an extra play session can wait until tomorrow. Owner preferences (`Owner.preferences`) are stored but not used yet. I left them for later because "preferences" was too vague to turn into a clear rule without guessing what an owner means by it.
 
 **b. Tradeoffs**
 
@@ -52,12 +67,23 @@ A related tradeoff: `build_plan()` picks tasks greedily by priority (high first,
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+I used an AI coding assistant (Claude Code) at every stage: brainstorming the four classes and drafting the UML, generating the class skeleton, implementing the scheduler, writing and debugging tests, wiring up the Streamlit UI, and drafting documentation.
+
+**The most effective features were:**
+
+- **Agent mode editing several files at once.** Adding recurring tasks touched `pawpal_system.py`, `main.py`, `app.py`, the tests, and the UML together. Having those updated in one change kept them consistent.
+- **Running the code and checking its own work.** The assistant ran `python main.py` and `python -m pytest` after every change and drove the Streamlit app in a browser to click through it. That caught real problems: a stale Streamlit server still using old code, a pet task count that lagged one click behind, and a conflict warning showing up twice.
+- **Asking for a plan before code.** Asking "what are the most important edge cases to test?" or "what algorithms would make this smarter?" before writing anything gave me a list to review and choose from. The edge-case plan turned up a real bug (completing a recurring task twice).
+
+**The most helpful prompts** were specific and pointed at a file or method: "review my skeleton for missing relationships," "how should the Scheduler get tasks from the Owner?", and "how could this algorithm be simplified for readability or performance?" Open-ended questions like "make it better" were less useful than questions about one decision.
+
+**Separate chat sessions:** the course suggested a fresh chat for each phase. I mostly kept one long session and used the phase boundaries as checkpoints instead: each phase ended with passing tests, a README or reflection update, and a commit. That gave me the same benefit separate chats would have, a clean stopping point where the code, docs, and diagram all agreed, while the assistant still remembered earlier decisions (like why completion lives on `Pet`). The tradeoff is that a long session carries old assumptions forward, so I re-checked the UML against the final code in Phase 6 instead of trusting it.
 
 **b. Judgment and verification**
 
 When I asked the AI how to simplify `detect_conflicts()`, it offered three options. The first used `itertools.combinations` to loop over every pair of tasks. The second was a faster "sweep" that tracks only the latest end time. The third packed the whole check into one nested list comprehension. I kept the `combinations` version because it removed the index juggling (`enumerate` plus `timed[:i]`) and reads like the idea itself: "check every pair." I rejected the sweep because it only remembers one earlier task, so it can miss a pair when three tasks overlap. It's faster, but for a few pet tasks correctness matters more than speed. I rejected the one-line comprehension because it was the most "Pythonic" but much harder to read. I checked the change by re-running the test suite (all 10 tests passed) and confirming `main.py` printed the same two conflict warnings as before.
+
+Another example, about keeping the design clean: when the "Mark complete" button was first added to the app, the code marked the task done and created its next copy right inside `app.py`. That copied logic that already lived in `Pet`. If I ever changed how recurrence works, the app and the logic layer could quietly disagree. I had it moved into one method, `Pet.complete_task()`, which both the app and `Pet.mark_task_complete()` now call. The UI only decides *which* task was clicked; the logic layer decides what completing it means.
 
 ---
 
@@ -92,12 +118,16 @@ If I had more time, I would test next:
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+I'm most satisfied with how the pieces line up. The UML, the code, the tests, the terminal demo, and the app all describe the same system, and the scheduler's behavior is easy to explain: high priority first, keep what fits, warn about clashes. I'm also happy with the conflict detection. It catches partial overlaps (not just identical times), works across pets, and has tests for the tricky cases, like one long walk overlapping two later tasks.
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+- **Respect set times in the plan.** `build_plan()` still places tasks back to back from the start time and ignores each task's own set time. Now that the app lets owners set times, I'd redesign it to pin fixed-time tasks first and fill the gaps with flexible ones.
+- **Use owner preferences**, for example "walks in the morning" or "no tasks after 20:00", once I can define them as clear rules.
+- **Save data** to a file so pets and tasks survive a page refresh.
+- **Use IDs instead of names** for pets and tasks, so two tasks with the same title can't be confused.
+- **Automated UI tests** with Streamlit's testing tools, since the app is currently checked mostly by hand.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+Being the "lead architect" with a powerful AI tool means owning the decisions, not the keystrokes. The AI could write a working scheduler, tests, and UI quickly. But it was up to me to decide what the system should *be*: four simple classes instead of more, conflicts as warnings instead of automatic fixes, readable code over the cleverest one-liner, and recurrence logic living in one place. The AI was best at offering options and doing the work once a direction was set. My job was to ask for options before code, choose based on what a real pet owner needs, and insist on proof: running tests, running the demo, and clicking through the app instead of trusting that something works because it looks right. The UML diagram helped a lot here. Designing first gave me something to compare the AI's code against, so I could tell when a suggestion fit the design and when it was quietly changing it.
