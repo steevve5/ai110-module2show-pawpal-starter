@@ -65,13 +65,26 @@ When I asked the AI how to simplify `detect_conflicts()`, it offered three optio
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+I wrote 33 automated tests in `tests/test_pawpal.py` covering the five core behaviors of the logic layer:
+
+- **Sorting:** `sort_by_time()` returns tasks in chronological order, with untimed tasks last, and "7:30" is stored as "07:30" so it doesn't sort after "17:00".
+- **Building the daily plan:** high-priority tasks go first with back-to-back times. A task that doesn't fit is skipped while a shorter one still fills the gap. A task that exactly uses the remaining minutes is kept. Zero minutes skips everything, and running the planner twice doesn't duplicate tasks.
+- **Recurring tasks:** completing a daily task creates a copy due tomorrow (weekly: in 7 days; "once": nothing), and tomorrow's copy stays out of today's plan.
+- **Conflict detection:** identical and overlapping time slots are flagged, for the same pet or different pets. Back-to-back, untimed, completed, and not-yet-due tasks are not.
+- **Filtering and validation:** filtering by pet and status works, and bad input like an unknown priority, a duration of 0, or "25:00" raises a clear error.
+
+These tests matter because the scheduler's mistakes would be quiet. A wrong sort or an off-by-one in the time budget doesn't crash anything; it just gives a pet owner a bad plan, like skipping medication. The edge-case tests found a real bug: calling `mark_task_complete("Meds")` twice used to quietly complete *tomorrow's* copy early. I fixed it so only tasks due today can be completed by name. To make sure that test actually guards the fix, I temporarily put the old code back and confirmed exactly that one test failed.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+I'd rate it 4 out of 5. The scheduling logic is well covered: every core behavior has both happy-path and edge-case tests, and all 33 pass. I'm not giving it 5 because the Streamlit UI is only checked by hand in the browser, and there are known gaps. For example, `build_plan()` doesn't yet place tasks at their own set times.
+
+If I had more time, I would test next:
+
+- **Plans that run past midnight:** a 23:30 start with an hour of tasks wraps around to "00:00", which then sorts before "23:30".
+- **Duplicate names:** two pets with the same name, or two tasks with the same title for one pet, since removing and completing by name picks the first match.
+- **Tasks longer than the whole day's budget,** and a very large number of tasks, to check that conflict detection stays fast.
+- **The Streamlit app itself,** using Streamlit's testing tools to check that adding a pet or completing a task updates the page.
 
 ---
 
