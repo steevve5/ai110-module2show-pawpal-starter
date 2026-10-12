@@ -133,11 +133,15 @@ class Pet:
         return next_task
 
     def mark_task_complete(self, title: str) -> Task | None:
-        """Complete the first pending task with this title (see complete_task)."""
+        """Complete the first pending task with this title that's due today or earlier (see complete_task).
+
+        Future copies of recurring tasks are skipped, so calling this twice by mistake
+        raises instead of quietly completing tomorrow's task early.
+        """
         for task in self.tasks:
-            if task.title == title and not task.completed:
+            if task.title == title and not task.completed and task.due_date <= date.today():
                 return self.complete_task(task)
-        raise ValueError(f"{self.name} has no pending task called {title!r}")
+        raise ValueError(f"{self.name} has no task called {title!r} due today")
 
     def get_pending_tasks(self) -> list[Task]:
         """Return tasks that are not completed yet."""

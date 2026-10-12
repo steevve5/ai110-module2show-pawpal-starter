@@ -71,19 +71,45 @@ Output from running `python main.py` (one owner with 90 minutes, a dog and a cat
 
 ## 🧪 Testing PawPal+
 
-```bash
-# Run the full test suite:
-pytest
+Run the full test suite from the project folder:
 
-# Run with coverage:
-pytest --cov
+```bash
+python -m pytest
 ```
+
+Add `-v` to see each test by name. All tests live in `tests/test_pawpal.py` and cover the logic layer in `pawpal_system.py`:
+
+| Area | What the tests check |
+|------|----------------------|
+| **Basics** | `mark_complete()` changes a task's status; `add_task()` increases a pet's task count. |
+| **Sorting** | `sort_by_time()` returns tasks in chronological order with untimed tasks last; "7:30" is stored as "07:30" so it sorts correctly. |
+| **Daily plan** | High priority goes first with back-to-back times; a task that doesn't fit is skipped while a shorter one fills the gap; a task that exactly fills the remaining time is kept; 0 minutes skips everything; re-running doesn't duplicate tasks; overdue tasks are still planned; an owner with no pets or a pet with no tasks gives an empty plan. |
+| **Filtering** | `filter_tasks()` by pet, by status, and both; an unknown pet name returns an empty list. |
+| **Recurring tasks** | Completing a daily task adds a copy due tomorrow, weekly adds one due in 7 days, and `once` adds nothing; tomorrow's copy is left out of today's plan; a late completion schedules the next copy from today; completing the same task twice doesn't complete tomorrow's copy early. |
+| **Conflict detection** | Same time for two pets and duplicate times for one pet are flagged; partial overlaps are flagged; one long task overlapping two later tasks gives two warnings; back-to-back, untimed, completed, and not-yet-due tasks are not flagged. |
+| **Input validation** | Invalid priority, a duration of 0, bad times ("8am", "25:00"), and unknown frequencies raise `ValueError`; priority is case-insensitive. |
 
 Sample test output:
 
 ```
-# Paste your pytest output here
+============================= test session starts =============================
+platform win32 -- Python 3.12.4, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\gstev\ai110-module2show-pawpal-starter
+plugins: anyio-4.9.0
+collected 33 items
+
+tests\test_pawpal.py .................................                   [100%]
+
+============================= 33 passed in 0.06s ==============================
 ```
+
+**Confidence level: ⭐⭐⭐⭐☆ (4/5)**
+
+The scheduling logic is well covered. All 33 tests pass, including edge cases like exact-fit time budgets, overlapping conflicts, and late or repeated completions of recurring tasks. I also checked that the tests can fail: temporarily restoring an older bug made exactly the matching test fail. I'm holding back the fifth star because:
+
+- The Streamlit UI (`app.py`) is only checked by hand in the browser, not by automated tests.
+- Plans that run past midnight wrap around to "00:00" and aren't handled or tested.
+- `build_plan()` doesn't yet place tasks at their own set times (see Known limitations below).
 
 ## 📐 Smarter Scheduling
 
