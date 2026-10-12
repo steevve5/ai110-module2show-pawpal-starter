@@ -19,8 +19,15 @@ My initial UML (`diagrams/uml.mmd`) has four classes. An Owner has one or more P
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+Yes. After writing the class skeleton, I asked my AI assistant to review `pawpal_system.py` for missing relationships and logic bottlenecks. I made three changes:
+
+- **Tasks now remember which pet they belong to (`Task.pet_name`).** `Owner.get_all_tasks()` combines every pet's tasks into one list, so once the Scheduler gets that list it can't tell whose task is whose. With two pets that both have a "Feeding" task, the plan would be confusing. `Pet.add_task` now tags each task with the pet's name, so the plan can say "Feeding (Mochi)."
+- **Tasks get a scheduled time (`Task.scheduled_time`).** The app is supposed to explain *when* each task happens, but the original design only had a start time on the Scheduler and nowhere to store each task's time slot. `build_plan` will now fill in an "HH:MM" time for every planned task.
+- **Priorities come from one shared table (`PRIORITY_RANK`).** Priority is a plain string, so a typo like "High" or "urgent" would quietly break sorting. A single `{"low": 1, "medium": 2, "high": 3}` mapping is now the one place that defines which priorities are valid and how they rank.
+
+I also noted that `build_plan` has to clear `planned` and `skipped` before it runs. Otherwise, clicking "Generate schedule" twice would duplicate tasks.
+
+The review raised a few other points that I decided to leave for later phases. `Owner.preferences` isn't used by the Scheduler yet. `frequency` doesn't do anything until the scheduler knows what day it is. And removing tasks or pets by name is ambiguous if two of them share a name.
 
 ---
 
